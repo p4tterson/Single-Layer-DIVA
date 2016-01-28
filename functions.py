@@ -1,65 +1,115 @@
-## - - - - - - - - - - - - - - - - - - - - - - - - ##
-# sigmoid activation function
-def sigmoid(x):
-  return 1 / (1 + exp(-x))
-
-
-## - - - - - - - - - - - - - - - - - - - - - - - - ##
-# function to average rows of an array by block number
-def blockrows(DATA, N):
-	nrows, ncols = DATA.shape
-	result = reshape(DATA, [N,nrows/N*ncols], order='F')
-	result = mean(result, axis=0)
-	return reshape(result, [nrows/N, ncols], order='F')
-
 
 ## - - - - - - - - - - - - - - - - - - - - - - - - ##
 # function to train the model
 def train_network(model):
 
 	# get info from model dictionary
-	numitems, numfeatures = model['inputs'].shape
-	numcategories = len(unique(model['categories']))
-	numblocks, numinitials, learnrate, weightrange = model['parameters']
-	numupdates = numblocks * numitems
+	INPUTS, ASSIGNMENTS = model['inputs'], model['categories']
+	NUMBLOCKS, NUMINITS, LR, WR = model['parameters']
+	DIAGONALCONNS = model['diagonalconnections']
 
+	# get various dimensions
+	NUMINPUTS, NUMFEATURES = INPUTS.shape
+	NUMCLASSES = len(np.unique(ASSIGNMENTS))
 
-	# scale targets to [0 1]
-	targets = matrix(model['inputs'])
-	targets[targets<0] = 0
+	# --- add bias unit to input patterns
+	in_with_bias = insert(INPUTS,0,1,axis=1)
 
 	# Iterate across initializations
-	accuracy = empty([numupdates, numinitials])
-	for K in range(numinitials):
+	accuracy = empty([NUMBLOCKS, NUMINITS])
+	for K in range(NUMINITS):
 
-		# get network weights and presentation order
-		wts = uniform(-weightrange, weightrange, [numfeatures+1,numfeatures,numcategories])
-		sequence = [j for i in range(numblocks) for j in permutation(numitems)]
+		# ----- get network weights
+		wts = uniform(-WR, WR, [NUMFEATURES+1,NUMFEATURES,NUMCLASSES])
 
-		for U in range(numupdates):
-			update_input  = matrix(model['inputs'][sequence[U]])
-			update_class  = model['categories'][sequence[U]]
-			update_target = targets[sequence[U]]
+		# zero out diagonal connections if desired
+		if not DIAGONALCONNS:
+			# get index of same-dimension connections
+			diagonal_index = np.eye(NUMFEATURES) == 1
+			diagonal_index = insert(diagonal_index, 0, False, axis=0)
 
-			# add bias
-			update_input = insert(update_input,0,1)
+			# force weights to 0
+			wts[diagonal_index] = 0
 
-			# forward pass
-			output = empty([numcategories,numfeatures])
-			for C in range(numcategories):
-				output[C,:] = dot(update_input, wts[:,:,C])
-			output = sigmoid(output) # comment out for linear
 
-			# get SSE and compute classification probability
-			Inverse_SSE = 1 / sum(square(output - update_target),axis=1)
-			accuracy[U,K] = Inverse_SSE[update_class] / sum(Inverse_SSE)
+		# iterate across blocks
+		for B in range(NUMBLOCKS):
+
+			# run forward pass
+			output = forwardpass(in_with_bias, wts)
+
+			# get classification responses, store accuracy
+			responses = responserule(output,INPUTS)
+
+			# store mean accuracy
+			accuracy[B,K] = mean(np.equal(ASSIGNMENTS,responses))
 
 			# update weights
-			delta = output[update_class,:] - update_target
-			delta = learnrate * dot(update_input.T, delta)
-			wts[:,:,update_class] -= delta
-		
+			wts = weightupdate(wts, output, INPUTS, ASSIGNMENTS, LR, DIAGONALCONNS)
 
 	# block accuracy into rows, and average across initializations
-	return mean(blockrows(accuracy,numitems),axis=1)
+	return mean(accuracy,axis=1)
 
+
+# ------------------------------------------------------
+# ------------------------------------------------------
+# propagate weights through network
+def forwardpass(INPUTS,WTS, bias=True):
+	NUMINPUTS = INPUTS.shape[0]
+	_ , NUMFEATURES, NUMCLASSES = WTS.shape
+
+	# dot prod inputs via weights from each category channel
+	output = empty([NUMINPUTS,NUMFEATURES,NUMCLASSES])
+	for C in range(NUMCLASSES):
+		output[:,:,C] = dot(INPUTS, WTS[:,:,C])
+
+	return output
+
+
+# ------------------------------------------------------
+# ------------------------------------------------------
+# compute classification responses from output
+def responserule(OUTPUT,TARGETS):
+	NUMINPUTS, _ , NUMCLASSES = OUTPUT.shape
+
+	# compute error on each category's reconstruction
+	MSE = matrix(empty((NUMINPUTS,NUMCLASSES)))
+	for C in range(NUMCLASSES):
+		MSE[:,C] = mean(np.square(OUTPUT[:,:,C] - TARGETS) ,axis=1)
+
+	# classify items based on best reconstruction
+	return np.argmin(MSE,axis=1).T
+
+
+
+# ------------------------------------------------------
+# ------------------------------------------------------
+# update weights using delta rule
+def weightupdate(WTS, OUTPUT, INPUTS, ASSIGNMENTS, LR, DIAGONALCONNS):
+	_ , NUMFEATURES , NUMCLASSES = OUTPUT.shape
+	IN_BIAS = insert(INPUTS,0,1,axis=1)
+
+	# Update each class on its exemplars
+	for C in range(NUMCLASSES):
+
+		# get index of class items
+		INDS = np.equal(ASSIGNMENTS, C) 
+
+		# compute weight change
+		delta = OUTPUT[INDS,:,C] - INPUTS[INDS,:]
+		delta = LR * dot(IN_BIAS[INDS,:].T, delta)
+
+		# apply weight change
+		WTS[:,:,C] -= delta
+
+	# zero out diagonal connections if desired
+	if not DIAGONALCONNS:
+		# get index of same-dimension connections
+		diagonal_index = np.eye(NUMFEATURES) == 1
+		diagonal_index = insert(diagonal_index, 0, False, axis=0)
+
+		# force them to 0
+		WTS[diagonal_index] = 0
+
+	return WTS
+	
