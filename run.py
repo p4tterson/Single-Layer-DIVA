@@ -2,10 +2,6 @@
 # Libraries
 import numpy as np
 
-# import frequently used numpy commands...
-from numpy import matrix, empty, dot, mean, insert
-from numpy.random import uniform, permutation
-
 # custom functions
 execfile('functions.py')
 
@@ -22,21 +18,18 @@ parameters =[
 
 # Basic 2D XOR Problem
 XOR_2D = { 
-	'inputs': matrix([ 
+	'inputs': np.matrix([ 
 				[-1, -1],
 				[-1,  1],
 				[ 1, -1],
 				[ 1,  1]]),
 	'categories': [0, 1, 1, 0],
 	'parameters': parameters,
-
-	# allow same feature connections?
-	"diagonalconnections": True, 
 		}
 
 # Medin & Schwanenflugel (1981, E4) NLS Problem
 Medin_NLS = { 
-	'inputs': matrix([ 
+	'inputs': np.matrix([ 
 				[-1, -1,  1],
 				[-1,  1, -1],
 				[-1,  1,  1],
@@ -45,12 +38,11 @@ Medin_NLS = {
 				[ 1,  1, -1]]),
 	'categories': [0, 1, 0, 0, 1, 1],
 	'parameters': parameters,
-	"diagonalconnections": True,
 		}
 
 # 3-Bit Parity Problem, or Type VI from Shepard et al. (1961)
 Three_Bit_Parity = { 
-	'inputs': matrix([ 
+	'inputs': np.matrix([ 
 				[-1, -1, -1],
 				[-1, -1,  1],
 				[-1,  1, -1],
@@ -61,7 +53,6 @@ Three_Bit_Parity = {
 				[ 1,  1,  1]]),
 	'categories': [0, 1, 1, 0, 1, 0, 0, 1],
 	'parameters': parameters,
-	"diagonalconnections": True,
 		}
 
 ## - - - - - - - - - - - - - - - - - - - - - - - - ##
@@ -70,15 +61,12 @@ XOR_Accuracy = train_network(XOR_2D)
 Medin_NLS_Accuracy = train_network(Medin_NLS)
 Three_Bit_Parity_Accuracy = train_network(Three_Bit_Parity)
 
-print '\nTRAINING ACCURACY BY BLOCK:'
-print '\t\t\t\t\t\tXOR \tNLS \t3-Bit'
+print('''\nTRAINING ACCURACY BY BLOCK:\n
+\t\t\tXOR \tNLS \t3-Bit''')
 for i in range(parameters[0]):
-	if i<9:
-		S = '\tBlock 0' + str(i+1) + '\t'
-	else:
-		S = '\tBlock ' + str(i+1) + '\t'
+	S = '\t' + str(i+1) + ''
 	for j  in [XOR_Accuracy, Medin_NLS_Accuracy, Three_Bit_Parity_Accuracy]:
 		S += '\t\t' + str(round(j[i],3))
-	print S
+	print(S)
 
-print '\nDone.\n'
+print('\nDone.\n')

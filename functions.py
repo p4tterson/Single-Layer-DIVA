@@ -6,64 +6,55 @@ def train_network(model):
 	# get info from model dictionary
 	INPUTS, ASSIGNMENTS = model['inputs'], model['categories']
 	NUMBLOCKS, NUMINITS, LR, WR = model['parameters']
-	DIAGONALCONNS = model['diagonalconnections']
 
 	# get various dimensions
 	NUMINPUTS, NUMFEATURES = INPUTS.shape
 	NUMCLASSES = len(np.unique(ASSIGNMENTS))
 
 	# --- add bias unit to input patterns
-	in_with_bias = insert(INPUTS,0,1,axis=1)
+	in_with_bias = np.insert(INPUTS,0,1,axis=1)
 
 	# Iterate across initializations
-	accuracy = empty([NUMBLOCKS, NUMINITS])
+	accuracy = np.empty([NUMBLOCKS, NUMINITS])
 	for K in range(NUMINITS):
 
 		# ----- get network weights
-		wts = uniform(-WR, WR, [NUMFEATURES+1,NUMFEATURES,NUMCLASSES])
-
-		# zero out diagonal connections if desired
-		if not DIAGONALCONNS:
-			# get index of same-dimension connections
-			diagonal_index = np.eye(NUMFEATURES) == 1
-			diagonal_index = insert(diagonal_index, 0, False, axis=0)
-
-			# force weights to 0
-			wts[diagonal_index] = 0
-
+		wts = np.random.uniform(-WR, WR, [NUMFEATURES+1,NUMFEATURES,NUMCLASSES])
 
 		# iterate across blocks
 		for B in range(NUMBLOCKS):
 
-			# run forward pass
+			# run forward pass and get classification responses
 			output = forwardpass(in_with_bias, wts)
-
-			# get classification responses, store accuracy
 			responses = responserule(output,INPUTS)
-
-			# store mean accuracy
-			accuracy[B,K] = mean(np.equal(ASSIGNMENTS,responses))
+			accuracy[B,K] = np.mean(np.equal(ASSIGNMENTS,responses))
 
 			# update weights
-			wts = weightupdate(wts, output, INPUTS, ASSIGNMENTS, LR, DIAGONALCONNS)
+			wts = weightupdate(wts, output, INPUTS, ASSIGNMENTS, LR)
 
 	# block accuracy into rows, and average across initializations
-	return mean(accuracy,axis=1)
+	return np.mean(accuracy,axis=1)
 
 
 # ------------------------------------------------------
 # ------------------------------------------------------
 # propagate weights through network
-def forwardpass(INPUTS,WTS, bias=True):
+def forwardpass(INPUTS,WTS):
 	NUMINPUTS = INPUTS.shape[0]
 	_ , NUMFEATURES, NUMCLASSES = WTS.shape
 
-	# dot prod inputs via weights from each category channel
-	output = empty([NUMINPUTS,NUMFEATURES,NUMCLASSES])
+	# inputs * weights for each category channel
+	output = np.empty([NUMINPUTS,NUMFEATURES,NUMCLASSES])
 	for C in range(NUMCLASSES):
-		output[:,:,C] = dot(INPUTS, WTS[:,:,C])
+		output[:,:,C] = np.dot(INPUTS, WTS[:,:,C])
 
+	#  if logistic outs are desired, uncomment this line:
+	# output = sigmoid(output)
 	return output
+
+# a quick logistic activation function
+def sigmoid(z):
+	return 1 / (1 + np.exp(-z))
 
 
 # ------------------------------------------------------
@@ -73,9 +64,9 @@ def responserule(OUTPUT,TARGETS):
 	NUMINPUTS, _ , NUMCLASSES = OUTPUT.shape
 
 	# compute error on each category's reconstruction
-	MSE = matrix(empty((NUMINPUTS,NUMCLASSES)))
+	MSE = np.matrix(np.empty((NUMINPUTS,NUMCLASSES)))
 	for C in range(NUMCLASSES):
-		MSE[:,C] = mean(np.square(OUTPUT[:,:,C] - TARGETS) ,axis=1)
+		MSE[:,C] = np.mean(np.square(OUTPUT[:,:,C] - TARGETS) ,axis=1)
 
 	# classify items based on best reconstruction
 	return np.argmin(MSE,axis=1).T
@@ -85,9 +76,9 @@ def responserule(OUTPUT,TARGETS):
 # ------------------------------------------------------
 # ------------------------------------------------------
 # update weights using delta rule
-def weightupdate(WTS, OUTPUT, INPUTS, ASSIGNMENTS, LR, DIAGONALCONNS):
+def weightupdate(WTS, OUTPUT, INPUTS, ASSIGNMENTS, LR):
 	_ , NUMFEATURES , NUMCLASSES = OUTPUT.shape
-	IN_BIAS = insert(INPUTS,0,1,axis=1)
+	IN_BIAS = np.insert(INPUTS,0,1,axis=1)
 
 	# Update each class on its exemplars
 	for C in range(NUMCLASSES):
@@ -95,21 +86,10 @@ def weightupdate(WTS, OUTPUT, INPUTS, ASSIGNMENTS, LR, DIAGONALCONNS):
 		# get index of class items
 		INDS = np.equal(ASSIGNMENTS, C) 
 
-		# compute weight change
+		# compute and apply weight change
 		delta = OUTPUT[INDS,:,C] - INPUTS[INDS,:]
-		delta = LR * dot(IN_BIAS[INDS,:].T, delta)
-
-		# apply weight change
+		delta = LR * np.dot(IN_BIAS[INDS,:].T, delta)
 		WTS[:,:,C] -= delta
-
-	# zero out diagonal connections if desired
-	if not DIAGONALCONNS:
-		# get index of same-dimension connections
-		diagonal_index = np.eye(NUMFEATURES) == 1
-		diagonal_index = insert(diagonal_index, 0, False, axis=0)
-
-		# force them to 0
-		WTS[diagonal_index] = 0
 
 	return WTS
 	
