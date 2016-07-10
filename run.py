@@ -1,9 +1,14 @@
 ## - - - - - - - - - - - - - - - - - - - - - - - - ##
 # Libraries
 import numpy as np
+import sys
+
+print(sys.version)
+print("Numpy: " + np.__version__)
 
 # custom functions
-execfile('functions.py')
+with open("functions.py") as f:
+	exec(f.read())
 
 ## - - - - - - - - - - - - - - - - - - - - - - - - ##
 # store info in model dictionaries

@@ -14,4 +14,4 @@ This is a short python script to run simulations with a single-layer DIVA networ
 The performance of this network is notable due to its ability to acquire nonlinearly separable classifications. Accordingly, `run.py` tests model performance on three NLS classifications.
 
 #####Requirements
-Users of this script will need NumPy. I use 1.9.2 without issue, but i have not tested this on other versions.
+Users of this script will need NumPy. I use 1.9.2 and 1.11.0 without issue, but i have not tested this on other versions. I *think* this works with Python 2 and 3, but again i have not extensively tested anything.
